@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 
+int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex);
+int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex);
 
 int main(int argc, char const *argv[])  {    
     // Vecteurs de test pour le chiffrement

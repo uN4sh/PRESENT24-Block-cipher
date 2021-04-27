@@ -64,6 +64,7 @@ void SUBSTITUTION(char *etat)  {
         for (size_t j = 0; j < 4; j++)
             substr[j] = etat[i+j];
         
+        // Substitution des 4 bits selon la Boite-S
         substitution_4_bits(substr);
 
         // Replace in etat[] 
@@ -104,8 +105,7 @@ void PERMUTATION(char *etat)  {
  * @param cle_maitre    Registre de 24 bits représentant la clé maître sans les 0 ajoutés
  * @param sous_cles     Tableau 2-Dimensions pour contenir 11 sous clés de 24 bits chacune 
  */
-void cadencement_cle(char *cle_maitre, 
-                    char sous_cles[][25])  {
+void cadencement_cle(char *cle_maitre, char sous_cles[][25])  {
     // Registre K de 80 bits contenant la clé maître complétée par des 0
     char K[80+1];
     snprintf(K, 81, "%s%056d", cle_maitre, 0);
@@ -192,7 +192,7 @@ void cadencement_cle(char *cle_maitre,
  * @return                  Message chiffré par l'algorithme           
  */
 int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex)  {
-    // Convert etat_hex and cle_maitre_hex to binary
+    // Convertit etat_hex and cle_maitre_hex en chaîne binaire
     char etat[TAILLE_MSG+1];
     char cle_maitre[TAILLE_MSG+1];
     hexa_to_binary(etat_hex, etat);
@@ -214,6 +214,6 @@ int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex)  {
 
     // Etat ← Etat ⊕ K_11
     result = strtol(etat, NULL, 2) ^ strtol(sous_cles[10], NULL, 2);
-    
+    // Message chiffré retourné après 10 tours d'algorithme
     return result;
 }
