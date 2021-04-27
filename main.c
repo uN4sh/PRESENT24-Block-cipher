@@ -19,22 +19,30 @@ int main(int argc, char const *argv[])  {
 
     // Chiffrement : 
     
-    // Vecteurs de test pour le chiffrement
+    // // Vecteurs de test pour le chiffrement
     char vecteurs_test[4][3][7] = { {"000000", "000000", "bb57e6"},
                                     {"ffffff", "000000", "739293"},
                                     {"000000", "ffffff", "1b56ce"},
                                     {"f955b9", "d1bd2d", "47a929"} };  
-
     char buf[10];
-    for (size_t i = 0; i < 4; i++)  {
-        snprintf ( buf, 10, "%x",  CHIFFREMENT(vecteurs_test[i][0], vecteurs_test[i][1]));
-        if (!strcmp(vecteurs_test[i][2], buf))
-            printf("\033[32mPassed: %s | %s | %s\033[00m\n", vecteurs_test[i][0], vecteurs_test[i][1], vecteurs_test[i][2]);
-        else
-            printf("\033[31mFailed: %s | %s | %s\033[00m\n", vecteurs_test[i][0], vecteurs_test[i][1], vecteurs_test[i][2]);
-    }
+
+    // for (size_t i = 0; i < 4; i++)  {
+    //     snprintf ( buf, 10, "%x",  CHIFFREMENT(vecteurs_test[i][0], vecteurs_test[i][1]));
+    //     if (!strcmp(vecteurs_test[i][2], buf))
+    //         printf("\033[32mPassed: %s | %s | %s\033[00m\n", vecteurs_test[i][0], vecteurs_test[i][1], vecteurs_test[i][2]);
+    //     else
+    //         printf("\033[31mFailed: %s | %s | %s\033[00m\n", vecteurs_test[i][0], vecteurs_test[i][1], vecteurs_test[i][2]);
+    // }
 
     // Déchiffrement :
+
+    for (size_t i = 0; i < 4; i++)  {
+        snprintf ( buf, 10, "%x",  DECHIFFREMENT(vecteurs_test[i][2], vecteurs_test[i][1]));
+        if (!strcmp(vecteurs_test[i][0], buf))
+            printf("\033[32mPassed: %s | %s | %s\033[00m\n", vecteurs_test[i][0], vecteurs_test[i][1], vecteurs_test[i][2]);
+        else
+            printf("\033[31mFailed: %s | %s | %s || %s \033[00m\n", vecteurs_test[i][0], vecteurs_test[i][1], vecteurs_test[i][2], buf);
+    }
 
 
     return 0;
