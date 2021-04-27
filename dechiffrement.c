@@ -4,66 +4,25 @@
 
 #define TAILLE_MSG 24
 
-/**
- * @brief Convertit un entier décimal en entrée en chaîne binaire
- * 
- * @param dec       Entier décimal à convertir en binaire
- * @param res       Chaîne résultat pour contenir le nombre binaire
- * @param lenght    Taille de la chaîne binaire (nombre de bits)
- */
-void decimal_to_binary(int dec, char *res, int lenght)
-{
-    res[lenght - 1] = '\0';
-    res[lenght - 2] = (dec & 1) + '0';
-    for (int i = lenght - 3; i > -1; i--)
-    {
-        res[i] = ((dec >> (lenght - 2 - i)) & 1) + '0';
-    }
-}
-
-/**
- * @brief Convertit une chaîne hexadécimale en une chaîne binaire de 24 bits
- * 
- * @param hex   Chaîne hexadécimale à convertir
- * @param res   Chaîne résultat pour contenir le nombre binaire de 24 bits
- */
-void hexa_to_binary(char *hex, char *res)
-{
-    int decvalue = strtol(hex, NULL, 16);
-    decimal_to_binary(decvalue, res, 25);
-}
-
-/**
- * @brief Substitue 4 bits en entrée via sa notation hexadécimale dans la Boîte-S 
- * 
- * @param bits  Chaîne de 4 bits à substituer selon la Boîte-S
- */
-void substitution_4_bits(char *bits)
-{
-    int s[16] = {12, 5, 6, 11, 9, 0, 10, 13, 3, 14, 15, 8, 4, 7, 1, 2};
-
-    // Convert binary string to int
-    int decvalue = strtol(bits, NULL, 2);
-
-    // Subsitute from S-Table
-    decvalue = s[decvalue];
-
-    // Convert to binary string
-    decimal_to_binary(decvalue, bits, 5);
-}
 
 /**
  * @brief Substitue 4 bits en entrée via sa notation hexadécimale dans la Boîte-S  pour le déchiffrement
  * 
  * @param bits  Chaîne de 4 bits à substituer selon la Boîte-S de déchiffrement
  */
-void d_substitution_4_bits(char *bits)
-{
+void d_substitution_4_bits(char *bits)  {
     // int s[16] = {12, 5, 6, 11, 9, 0, 10, 13, 3, 14, 15, 8, 4, 7, 1, 2};
 
     // int s[16] = {0,  1,  2, 3,  4, 5, 6,  7,  8, 9, a, b, c, d, e, f};
     // printf("d_substit_4_b");
-    int s[16] = {5, 14, 15, 8, 12, 1, 27, 130, 110, 40, 60, 3, 0, 7, 9, 10};
+    // int s[16] = {5, 14, 15, 8, 12, 1, 27, 130, 110, 40, 60, 3, 0, 7, 9, 10};
+
+  // x    0 1 2 3 4 5 6 7 8 9 a b c d e f
+  // S[x] c 5 6 b 9 0 a d 3 e f 8 4 7 1 2
+
+  // x    0 1 2 3 4 5 6 7 8 9 a b c d e f
+  // S[x] 5 e f 8 c 1 2 d b 4 6 3 0 7 9 a
+    int s[16] = {5, 14, 15, 8, 12, 1, 2, 13, 11, 4, 6, 3, 0, 7, 9, 10}; 
 
     // Convert binary string to int
     int decvalue = strtol(bits, NULL, 2);
@@ -84,19 +43,19 @@ void d_substitution_4_bits(char *bits)
 void D_SUBSTITUTION(char *etat)
 {
     char substr[4];
-    for (size_t i = 0; i < TAILLE_MSG; i += 4)
-    {
+    for (size_t i = 0; i < TAILLE_MSG; i+=4)  {
         // Récupération des 4 bits
         for (size_t j = 0; j < 4; j++)
-            substr[j] = etat[i + j];
+            substr[j] = etat[i+j];
 
         d_substitution_4_bits(substr);
 
         // Replace in etat[]
         for (size_t j = 0; j < 4; j++)
-            etat[i + j] = substr[j];
+            etat[i+j] = substr[j];
     }
 }
+
 
 /**
  * @brief Couche linéaire du chiffrement : permutation bit-à-bit selon la table P.
@@ -107,110 +66,20 @@ void D_SUBSTITUTION(char *etat)
  * @param etat  Registre de 24 bits contenant l'état (chaine binaire)
  * @return      La variable état est modifiée, permuté bit-à-bit 
  */
-void D_PERMUTATION(char *etat)
-{
-    int p[TAILLE_MSG] = {0, 6, 12, 18, 1, 7, 13, 19, 2, 8, 14, 20,
-                         3, 9, 15, 21, 4, 10, 16, 22, 5, 11, 17, 23};
+void D_PERMUTATION(char *etat)  {
+    // int p[TAILLE_MSG] = {0, 6, 12, 18, 1, 7, 13, 19, 2, 8, 14, 20,
+    //                      3, 9, 15, 21, 4, 10, 16, 22, 5, 11, 17, 23};
+    int p[TAILLE_MSG] = {0, 4, 8, 12, 16, 20, 1, 5, 9, 13, 17, 21, 2, 6, 10, 14, 18, 22, 3, 7, 11, 15, 19, 23};
 
-    char tmp[TAILLE_MSG + 1];
-    for (size_t i = 0; i < TAILLE_MSG; i++)
-    {
+    char tmp[TAILLE_MSG+1];
+    for (size_t i = 0; i < TAILLE_MSG; i++)  {
         tmp[p[i]] = etat[i];
     }
     tmp[TAILLE_MSG] = '\0';
 
-    for (size_t i = 0; i < TAILLE_MSG + 1; i++)
-    {
+    for (size_t i = 0; i < TAILLE_MSG+1; i++)  {
         etat[i] = tmp[i];
     }
-}
-
-/**
- * @brief Cadencement de clé : génère 11 sous-clés de 24 bits chacune à partir d'une clé maître
- * 
- * @param cle_maitre    Registre de 24 bits représentant la clé maître sans les 0 ajoutés
- * @param sous_cles     Tableau 2-Dimensions pour contenir 11 sous clés de 24 bits chacune 
- */
-void cadencement_cle(char *cle_maitre,
-                     char sous_cles[][25])
-{
-    // Registre K de 80 bits contenant la clé maître complétée par des 0
-    char K[80 + 1];
-    snprintf(K, 81, "%s%056d", cle_maitre, 0);
-
-    char substr_s1_1[19 + 1];
-    char substr_s1_2[61 + 1];
-    char substr_s2[4 + 1];
-    char substr_s3[5 + 1];
-    int decvalue;
-    int k;
-
-    // 11 tours pour générer les sous-clés
-    for (size_t i = 0; i < 11; i++)
-    {
-
-        // Extraction des bits 39 à 16 pour la sous-clé Ki
-        k = 0;
-        for (size_t j = 40; j <= 63; j++)
-        {
-            sous_cles[i][k] = K[j];
-            k++;
-        }
-        sous_cles[i][24] = '\0';
-
-        // Mise à jour du registre K en 3 étapes
-        // Step 1: Rotation du registre de 61 bits vers la gauche -> [k18k17..k0k79..k20k19]
-        k = 0;
-        for (int j = 61; j <= 79; j++)
-        { // Récupérer k18-k0
-            substr_s1_1[k] = K[j];
-            k++;
-        }
-        substr_s1_1[k] = '\0';
-
-        k = 0;
-        for (size_t j = 0; j <= 60; j++)
-        { // Récupérer k79-k19
-            substr_s1_2[k] = K[j];
-            k++;
-        }
-        substr_s1_2[k] = '\0';
-
-        strcpy(K, substr_s1_1);
-        strcat(K, substr_s1_2);
-
-        // Step 2: Application de la Boîte-S aux bits 79-76
-        for (size_t j = 0; j < 4; j++)
-            substr_s2[j] = K[j];
-
-        substr_s2[k] = '\0';
-        substitution_4_bits(substr_s2);
-
-        for (size_t j = 0; j < 4; j++)
-            K[j] = substr_s2[j];
-
-        // Step 3: XOR des bits extraits 19-15 avec la valeur binaire de i ∈ [1,11]
-        k = 0;
-        for (size_t j = 60; j <= 64; j++)
-        { // k19-k15
-            substr_s3[k] = K[j];
-            k++;
-        }
-
-        decvalue = strtol(substr_s3, NULL, 2) ^ (i + 1);
-        decimal_to_binary(decvalue, substr_s3, 6);
-        k = 0;
-        for (size_t j = 60; j <= 64; j++)
-        {
-            K[j] = substr_s3[k];
-            k++;
-        }
-    }
-    // Afficher les 11 sous-clés
-    // for (int i = 0; i < 11; i++)  {
-    //     decvalue = strtol(sous_cles[i], NULL, 2);
-    //     printf("%02d - %s | %06x\n", i+1, sous_cles[i], decvalue);
-    // }
 }
 
 /**
@@ -245,7 +114,6 @@ int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex)
         D_PERMUTATION(etat);
         D_SUBSTITUTION(etat);
 
-        printf("%ld : %s\n", i, etat);
 
         result = strtol(etat, NULL, 2) ^ strtol(sous_cles[i], NULL, 2);
     }
