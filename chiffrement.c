@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#define TAILLE_MOT 6
 #define TAILLE_MSG 24
 
 /**
@@ -191,7 +192,7 @@ void cadencement_cle(char *cle_maitre, char sous_cles[][25])  {
  * 
  * @return                  Message chiffré par l'algorithme           
  */
-int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex)  {
+int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex, char *cipher)  {
     // Convertit etat_hex and cle_maitre_hex en chaîne binaire
     char etat[TAILLE_MSG+1];
     char cle_maitre[TAILLE_MSG+1];
@@ -214,6 +215,21 @@ int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex)  {
 
     // Etat ← Etat ⊕ K_11
     result = strtol(etat, NULL, 2) ^ strtol(sous_cles[10], NULL, 2);
+
     // Message chiffré retourné après 10 tours d'algorithme
+    snprintf ( cipher, TAILLE_MOT+1, "%06x", result);
     return result;
+}
+
+
+/**
+ * @brief Chiffrement double 2PRESENT24
+ * 
+ * @param message   Message clair à chiffrer
+ * @param cle_k1    Clé k1 pour le chiffrement du message
+ * @param cle_k1    Clé k2 pour le second chiffrement
+ */
+int CHIFFREMENT_DOUBLE(char *message, char *cle_k1, char *cle_k2, char *cipher)  {
+    CHIFFREMENT(message, cle_k1, cipher);
+    return CHIFFREMENT(cipher, cle_k2, cipher);
 }

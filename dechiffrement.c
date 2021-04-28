@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#define TAILLE_MOT 6
 #define TAILLE_MSG 24
 
 // Fonctions statiques définies dans le fichier chiffrement.c
@@ -100,7 +101,7 @@ void D_PERMUTATION(char *etat)  {
  * 
  * @return                  Message déchiffré par l'algorithme           
  */
-int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex)  {
+int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex, char *clair)  {
     // Convertit chiffre_hex and cle_maitre_hex en chaîne binaire
     char etat[TAILLE_MSG + 1];
     char cle_maitre[TAILLE_MSG + 1];
@@ -128,5 +129,6 @@ int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex)  {
     }
 
     // Message clair retourné après 10 tours d'algorithme
+    snprintf ( clair, TAILLE_MOT+1, "%06x", result);
     return result;
 }
