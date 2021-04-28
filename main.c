@@ -7,6 +7,7 @@
 int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex, char *cipher);
 int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex, char *clair);
 int CHIFFREMENT_DOUBLE(char *message, char *cle_k1, char *cle_k2, char *cipher);
+int DECHIFFREMENT_DOUBLE(char *cipher, char *cle_k1, char *cle_k2, char *message);
 
 int main(int argc, char const *argv[])  {    
     // Vecteurs de test pour le chiffrement
