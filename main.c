@@ -42,7 +42,8 @@ int main(int argc, char const *argv[])  {
 
     printf("\n\033[33mChiffrement puis déchiffrement de messages quelconques:\n\033[00m");
     char clairs[][3][TAILLE_MOT+1] = { {"19234e", "ce98f1", "314159"},
-                                       {"abc123", "456def", "abcdef"}
+                                       {"abc123", "456def", "abcdef"},
+                                       {"198ad6", "000023", "0000aa"}
                                       };
 
     printf("        Clair  |  Clé   | \033[34mCipher\033[0m | \033[35mDéchiffré\033[0m\n");
@@ -59,7 +60,7 @@ int main(int argc, char const *argv[])  {
     printf("\n\033[33mChiffrement double puis déchiffrement double de messages quelconques:\n\033[00m");
 
     printf("        Clair  |  Clé1  |  Clé2  | \033[34mCipher\033[0m | \033[35mDéchiffré\033[0m\n");
-    for (size_t i = 0; i < 2; i++)  {
+    for (size_t i = 0; i < 3; i++)  {
         CHIFFREMENT_DOUBLE(clairs[i][0], clairs[i][1], clairs[i][2], res_chiffre);
         DECHIFFREMENT_DOUBLE(res_chiffre, clairs[i][1], clairs[i][2], res_clair);
 
