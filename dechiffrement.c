@@ -98,7 +98,7 @@ void D_PERMUTATION(char *etat)  {
  * 
  * @param chiffre_hex       Message chiffré hexadécimal
  * @param cle_maitre_hex    Clé maître hexadécimale pour le déchiffrement
- * 
+ * @param clair             Résultat du déchiffrement PRESENT24^-1
  * @return                  Message déchiffré par l'algorithme           
  */
 int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex, char *clair)  {
@@ -131,4 +131,17 @@ int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex, char *clair)  {
     // Message clair retourné après 10 tours d'algorithme
     snprintf ( clair, TAILLE_MOT+1, "%06x", result);
     return result;
+}
+
+/**
+ * @brief Déchiffrement double 2PRESENT24, la clé k2 est utilisé lors du premier déchiffrement
+ * 
+ * @param cipher    Message chiffré à déchiffrer
+ * @param cle_k1    Clé k1 pour le second déchiffrement 
+ * @param cle_k2    Clé k2 pour le premier déchiffrement
+ * @param message   Résultat du déchiffrement double 2PRESENT24
+ */
+int DECHIFFREMENT_DOUBLE(char *cipher, char *cle_k1, char *cle_k2, char *message)  {
+    DECHIFFREMENT(cipher, cle_k2, message);
+    return DECHIFFREMENT(message, cle_k1, message);
 }

@@ -189,7 +189,7 @@ void cadencement_cle(char *cle_maitre, char sous_cles[][25])  {
  * 
  * @param etat_hex          Message clair hexadécimal
  * @param cle_maitre_hex    Clé maître hexadécimale pour le chiffrement
- * 
+ * @param cipher            Résultat du chiffrement PRESENT24
  * @return                  Message chiffré par l'algorithme           
  */
 int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex, char *cipher)  {
@@ -227,7 +227,8 @@ int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex, char *cipher)  {
  * 
  * @param message   Message clair à chiffrer
  * @param cle_k1    Clé k1 pour le chiffrement du message
- * @param cle_k1    Clé k2 pour le second chiffrement
+ * @param cle_k2    Clé k2 pour le second chiffrement
+ * @param cipher    Résultat du chiffrement double 2PRESENT24
  */
 int CHIFFREMENT_DOUBLE(char *message, char *cle_k1, char *cle_k2, char *cipher)  {
     CHIFFREMENT(message, cle_k1, cipher);
