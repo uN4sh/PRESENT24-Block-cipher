@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
 
 #define TAILLE_MOT 6
 #define TAILLE_MSG 24
@@ -9,78 +10,30 @@
 void decimal_to_binary(int dec, char *res, int lenght);
 void hexa_to_binary(char *hex, char *res);
 void cadencement_cle(char *cle_maitre, char sous_cles[][25]);
+void SUBSTITUTION(char *etat, int *s);
+void PERMUTATION(char *etat, int *p);
 
-/**
- * @brief Substitue 4 bits en entrée via sa notation hexadécimale dans la Boîte-S inverse (déchiffrement)
- * 
- * Inversion de la boîte-S :
- * x    0 1 2 3 4 5 6 7 8 9 a b c d e f
- * S    c 5 6 b 9 0 a d 3 e f 8 4 7 1 2
- * S-1  5 e f 8 c 1 2 d b 4 6 3 0 7 9 a
- * 
- * @param bits  Chaîne de 4 bits à substituer selon la Boîte-S inverse
- */
-void substitution_4_bits_inv(char *bits)  {
-    int s[16] = {5, 14, 15, 8, 12, 1, 2, 13, 11, 4, 6, 3, 0, 7, 9, 10}; 
-
-    // Convert binary string to int
-    int decvalue = strtol(bits, NULL, 2);
-
-    // Subsitute from S-Table
-    decvalue = s[decvalue];
-
-    // Convert to binary string
-    decimal_to_binary(decvalue, bits, 5);
-}
+uint32_t PERMUTATION_OPTI(uint32_t etat, int *p);
+uint32_t SUBSTITUTION_OPTI(uint32_t etat, int *s);
 
 
 /**
- * @brief Couche non linéaire du chiffrement : substitution 4 bits par 4 selon la boîte-S.
- * 
- * x    0 1 2 3 4 5 6 7 8 9 a b c d e f
- * S[x] c 5 6 b 9 0 a d 3 e f 8 4 7 1 2
- */
-void D_SUBSTITUTION(char *etat)
-{
-    char substr[4];
-    for (size_t i = 0; i < TAILLE_MSG; i+=4)  {
-        // Récupération des 4 bits
-        for (size_t j = 0; j < 4; j++)
-            substr[j] = etat[i+j];
-
-        // Substitution des 4 bits selon la Boite-S inverse
-        substitution_4_bits_inv(substr);
-
-        // Replace in etat[]
-        for (size_t j = 0; j < 4; j++)
-            etat[i+j] = substr[j];
-    }
-}
-
-
-/**
- * @brief Couche linéaire du chiffrement : permutation bit-à-bit selon la table P.
+ * @brief Inversion de P:
  * 
  *  i    0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
  *  P(i) 0  6 12 18  1  7 13 19  2  8 14 20  3  9 15 21  4 10 16 22  5 11 17 23
  *  P-1  0  4  8 12 16 20  1  5  9 13 17 21  2  6 10 14 18 22  3  7 11 15 19 23
- * 
- * @param etat  Registre de 24 bits contenant l'état (chaine binaire)
- * @return      La variable état est modifiée, permuté bit-à-bit 
  */
-void D_PERMUTATION(char *etat)  {
-    int p[TAILLE_MSG] = {0, 4, 8, 12, 16, 20, 1, 5, 9, 13, 17, 21,
-                         2, 6, 10, 14, 18, 22, 3, 7, 11, 15, 19, 23};
+int _p[TAILLE_MSG] = {0, 4, 8, 12, 16, 20, 1, 5, 9, 13, 17, 21,
+                     2, 6, 10, 14, 18, 22, 3, 7, 11, 15, 19, 23};
 
-    char tmp[TAILLE_MSG+1];
-    for (size_t i = 0; i < TAILLE_MSG; i++)  
-        tmp[p[i]] = etat[i];
-    
-    tmp[TAILLE_MSG] = '\0';
-
-    for (size_t i = 0; i < TAILLE_MSG+1; i++)  
-        etat[i] = tmp[i];
-}
+/**
+ * @brief Inversion de la boîte-S :
+ * x    0 1 2 3 4 5 6 7 8 9 a b c d e f
+ * S    c 5 6 b 9 0 a d 3 e f 8 4 7 1 2
+ * S-1  5 e f 8 c 1 2 d b 4 6 3 0 7 9 a
+ */
+int _s[16] = {5, 14, 15, 8, 12, 1, 2, 13, 11, 4, 6, 3, 0, 7, 9, 10};
 
 
 /**
@@ -121,8 +74,8 @@ int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex, char *clair)  {
         decimal_to_binary(result, etat, 25);
 
         // Permutation inverse bit à bit puis substitution selon la boîte-S inverse sur l'état chiffré
-        D_PERMUTATION(etat);
-        D_SUBSTITUTION(etat);
+        PERMUTATION(etat, _p);
+        SUBSTITUTION(etat, _s);
 
         // Etat ← Etat ⊕ K_i
         result = strtol(etat, NULL, 2) ^ strtol(sous_cles[i], NULL, 2);
@@ -134,14 +87,23 @@ int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex, char *clair)  {
 }
 
 /**
- * @brief Déchiffrement double 2PRESENT24, la clé k2 est utilisé lors du premier déchiffrement
+ * @brief Optimisation du déchiffrement: passage en bitwise 
  * 
- * @param cipher    Message chiffré à déchiffrer
- * @param cle_k1    Clé k1 pour le second déchiffrement 
- * @param cle_k2    Clé k2 pour le premier déchiffrement
- * @param message   Résultat du déchiffrement double 2PRESENT24
- */
-int DECHIFFREMENT_DOUBLE(char *cipher, char *cle_k1, char *cle_k2, char *message)  {
-    DECHIFFREMENT(cipher, cle_k2, message);
-    return DECHIFFREMENT(message, cle_k1, message);
+ * @param etat          Message chiffré en notation hexadécimale
+ * @param sous_cles     Tableau de 11 sous clés hexadécimales générées par le Key-schedule
+ * @return              Message déchiffré par l'algorithme PRESENT24^-1
+ */ 
+int DECHIFFREMENT_OPTI(uint32_t etat, uint32_t *sous_cles)  {
+    // Etat ← Etat ⊕ K_11
+    etat = etat ^ sous_cles[10];
+
+    for (int i = 9; i > -1; i--)  {
+        // Substitution et permutation de l'état
+        etat = PERMUTATION_OPTI (etat, _p);
+        etat = SUBSTITUTION_OPTI(etat, _s);
+        // Etat ← Etat ⊕ K_i
+        etat = etat ^ sous_cles[i];
+    }
+    // Message chiffré retourné après 10 tours d'algorithme
+    return etat;
 }
