@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
+#include <math.h>
 
 #define TAILLE_MOT 6
 #define TAILLE_MSG 24
@@ -128,7 +130,8 @@ void cadencement_cle(char *cle_maitre, char sous_cles[][25])  {
             k++;
         }
         sous_cles[i][24] = '\0';
-
+        // Opti.: Faire un masque avec un & pour extraire les 24 bits
+        // Exp : 000000000000000000000000000000011111111111111111111000000000000
 
         // Mise à jour du registre K en 3 étapes
             // Step 1: Rotation du registre de 61 bits vers la gauche -> [k18k17..k0k79..k20k19]
@@ -148,6 +151,9 @@ void cadencement_cle(char *cle_maitre, char sous_cles[][25])  {
         
         strcpy( K, substr_s1_1 );
         strcat( K, substr_s1_2 );
+        // Opti.: Récupérer via masque les bits 18 à 0
+        //        Shifter les bits 79-19
+        //        Replacer les 18 à 0 au début (Comment ?)
         
             
             // Step 2: Application de la Boîte-S aux bits 79-76
@@ -183,14 +189,52 @@ void cadencement_cle(char *cle_maitre, char sous_cles[][25])  {
     // }
 }
 
+void cadencement_cle_new(char *m_key, uint32_t *sous_cles)  {
+    uint32_t master_key = strtol(m_key, NULL, 16); 
+    // Division en High (bits 79-40) et Low (bits 39-16)
+    uint64_t master_high = (uint64_t)master_key << 16 ; // ajouter 16 0 sur la droite 
+    uint64_t master_low = 0; /* 40 0 */
+    
+    uint64_t tmp;
+    uint64_t premiers_bits_de_low;
+    uint64_t premiers_bits_de_high;
+    uint64_t derniers_bits_de_low;
+    uint64_t derniers_bits_de_high;
+
+    int s[16] = {12, 5, 6, 11, 9, 0, 10, 13, 3, 14, 15, 8, 4, 7, 1, 2};
+
+    for (int i = 0; i < 11; i++)  {
+        // Extraction de la clé
+        sous_cles[i] = master_low >> 16; // Extraction bit 39 à 16 -> 16 premiers bits de Low
+        
+        // Step 1: Rotation du registre de 61 bits vers la gauche -> [k18k17..k0k79..k20k19]
+        premiers_bits_de_low = master_low >> 19;
+        premiers_bits_de_high = master_high >> 19;
+        derniers_bits_de_low = master_low & 0x7FFFF; // Masque avec 00...001111111111111111111
+        derniers_bits_de_high = master_high & 0x7FFFF;
+        
+        master_high = (derniers_bits_de_low << 21) ^ premiers_bits_de_high; // 19 derniers bits de Low (18-0)    + 21 premiers bits de high (79-59)
+        master_low  = (derniers_bits_de_high << 21) ^ premiers_bits_de_low; // 19 derniers bits de high (58-40)  + 21 premiers bits de low  (39-19)
+
+        // Step 2: Application de la Boîte-S aux bits 79-76
+        tmp = master_high >> 36; // Extraire les 4 premiers bits de high
+        tmp = s[tmp]; // Subsitution Boîte-S
+        master_high = master_high & 0x0FFFFFFFFF; // Passer les 4 premiers bits de High à 0
+        master_high = master_high | ((uint64_t)tmp << 36); // Remplacer les 4 premiers bits par tmp
+
+        // Step 3: XOR des bits extraits 19-15 avec la valeur binaire de i ∈ [1,11]
+        master_low = master_low ^ (((uint64_t)i+1) << 15); // XOR des bits 19-15 avec i (shifté de 15)  
+    }
+}
+
 
 /**
  * @brief Algorithme de chiffrement PRESENT24
  * 
- * @param etat_hex          Message clair hexadécimal
- * @param cle_maitre_hex    Clé maître hexadécimale pour le chiffrement
- * @param cipher            Résultat du chiffrement PRESENT24
- * @return                  Message chiffré par l'algorithme           
+ * @param[in] etat_hex        Message clair hexadécimal
+ * @param[in] cle_maitre_hex  Clé maître hexadécimale pour le chiffrement
+ * @param[out] cipher         Résultat du chiffrement PRESENT24
+ * @return                    Message chiffré par l'algorithme           
  */
 int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex, char *cipher)  {
     // Convertit etat_hex and cle_maitre_hex en chaîne binaire
@@ -215,6 +259,33 @@ int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex, char *cipher)  {
 
     // Etat ← Etat ⊕ K_11
     result = strtol(etat, NULL, 2) ^ strtol(sous_cles[10], NULL, 2);
+
+    // Message chiffré retourné après 10 tours d'algorithme
+    snprintf ( cipher, TAILLE_MOT+1, "%06x", result);
+    return result;
+}
+
+int CHIFFREMENT2(char *etat_hex, char *cle_maitre_hex, char *cipher)  {
+    // Convertit etat_hex en chaîne binaire
+    char etat[TAILLE_MSG+1];
+    hexa_to_binary(etat_hex, etat);
+    
+    // Génération des 11 sous clés de 24 bits chacune via algo. cadencement de clés
+    uint32_t sous_cles[11];
+    cadencement_cle_new(cle_maitre_hex, sous_cles);
+    
+    int result;
+    for (size_t i = 0; i < 10; i++)  {
+        // Etat ← Etat ⊕ K_i
+        result = strtol(etat, NULL, 2) ^ sous_cles[i];
+        decimal_to_binary(result, etat, 25);
+        // Substitution et permutation de l'état
+        SUBSTITUTION(etat);
+        PERMUTATION(etat);
+    }
+
+    // Etat ← Etat ⊕ K_11
+    result = strtol(etat, NULL, 2) ^ sous_cles[10];
 
     // Message chiffré retourné après 10 tours d'algorithme
     snprintf ( cipher, TAILLE_MOT+1, "%06x", result);

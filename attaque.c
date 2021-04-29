@@ -4,12 +4,12 @@
 #include <string.h>
 
 #define TAILLE_MOT 7
-#define NB_K 16777216 // 2^24 = 16777216
+#define NB_K 1000000 // 2^24 = 16777216
 
 int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex, char *cipher);
 int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex, char *clair);
 int CHIFFREMENT_DOUBLE(char *message, char *cle_k1, char *cle_k2, char *cipher);
-
+int CHIFFREMENT2(char *etat_hex, char *cle_maitre_hex, char *cipher);
 
 /**
  * Attaque par le milieu :
@@ -29,33 +29,22 @@ int CHIFFREMENT_DOUBLE(char *message, char *cle_k1, char *cle_k2, char *cipher);
  *          - Trier les deux listes - O(2 * n*log n)
  *          - Chercher les éléments communs - O(n)
  *          Avec n = 2^24
- *          
+ *  
  *  Taille en mémoire : 2 listes de 2^24 -> 2^25 en mémoire
  *  Taille en temps :   2 * 2^24 * log(2^24) = 2 * 24 * 2^24 = 48 * 2^24
  */
 
 
 
-void genere_listes(char *clair, char ***lm, char *chiffre, char ***lc)  { 
-    for (int i = 0; i < NB_K; i++)  {
-        snprintf ( lm[i][1], TAILLE_MOT+1, "%06x", i );
-        snprintf ( lc[i][1], TAILLE_MOT+1, "%06x", i );
-        CHIFFREMENT(clair, lm[i][1], lm[i][0]);
-        DECHIFFREMENT(chiffre, lc[i][1], lc[i][0]);
-    }
-}
-
-void genere_listes_int(char *clair, int **lm_int, char *chiffre, int **lc_int)  { 
+void genere_listes(char *clair, int **lm_int, char *chiffre, int **lc_int)  { 
     char buf[TAILLE_MOT+1];
-    char k1_c[TAILLE_MOT+1];
-    char k2_c[TAILLE_MOT+1];
+    char k[TAILLE_MOT+1];
     for (int i = 0; i < NB_K; i++)  {
         lm_int[i][1] = i; 
-        lc_int[i][1] = i;
-        snprintf ( k1_c, TAILLE_MOT+1, "%06x", i );
-        snprintf ( k2_c, TAILLE_MOT+1, "%06x", i );
-        lm_int[i][0] =   CHIFFREMENT(clair  , k1_c, buf);
-        lc_int[i][0] = DECHIFFREMENT(chiffre, k2_c, buf);
+        // lc_int[i][1] = i;
+        snprintf ( k, TAILLE_MOT+1, "%06x", i );
+        lm_int[i][0] =   CHIFFREMENT2(clair  , k, buf);
+        // lc_int[i][0] = DECHIFFREMENT(chiffre, k, buf);
     }
 }
 
@@ -89,41 +78,6 @@ void quicksort_lists(int **list, int first, int last)  {
     }
 }
 
-// Recherche d'éléments communs dans les listes (lm[0] == lc[0]), et afficher les 2 clés k1, k2 correspondantes
-void research(char ***lm, char ***lc, char *m2, char *c2)  {
-    int i = 0, j = 0;
-    int lc_val, lm_val;
-
-    while(i < NB_K && j < NB_K)  {
-        lm_val = strtol(lc[i][1], NULL, 16);
-        lc_val = strtol(lm[j][0], NULL, 16);
-        
-        if (lm_val < lc_val)
-            i++;
-        else if(lc_val < lm_val)
-            j++;
-        else  {
-            printf("Élément commun: %s | Clé candidate: (%s, %s)\n", lm[i][0], lm[i][1], lc[j][1]);
-            i++;
-            j++;
-        }
-    }
-
-    // Recherche en O(2^n)
-    // for (int i = 0; i < NB_K; i++)  {
-    //     for (int j = 0; j < NB_K; j++)  {
-    //         if (!strcmp(lm[i][0], lc[j][0]))  {
-    //             // Candidat trouvé, test avec le deuxième couple clair chiffré:
-    //             char output[TAILLE_MOT-1];
-    //             CHIFFREMENT_DOUBLE(m2, lm[i][1], lc[j][1], output);
-    //             if (!strcmp(output, c2))  {
-    //                 printf("Clé fonctionnelle trouvée: %s (%s, %s)\n", lm[i][0], lm[i][1], lc[j][1]);
-    //             }
-    //         }        
-    //     }
-    // }
-
-}
 
 void research_int(int **lm, int **lc, char *m2, char *c2)  {
     int i = 0, j = 0;
@@ -150,7 +104,7 @@ void research_int(int **lm, int **lc, char *m2, char *c2)  {
             j++;
         }
     }
-    printf("Fin de la recherche, %d collisions rencontrées.\n");
+    printf("Fin de la recherche, %d collisions rencontrées.\n", collisions);
 }
 
 // ELYN (m1,c1) = (16a0e6, dcc916) (m2,c2) = (332962,cfeee9)
@@ -176,7 +130,7 @@ int main(int argc, char const *argv[])  {
     // Mode listes d'entiers
     clock_t begin = clock();
 
-    genere_listes_int(clair, lm_int, chiffre, lc_int);
+    genere_listes(clair, lm_int, chiffre, lc_int);
     printf("              Clair  |   Chiffré\n");
     printf("    \033[33;1mCouple :  \033[33;1m%s |    %s\033[0m\n\n", clair, chiffre);
     printf("    \033[34m   Clé |\033[0m Chiffré | Déchiffré\033[0m\n");
@@ -190,6 +144,8 @@ int main(int argc, char const *argv[])  {
     double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Temps écoulé: %fs for %d keys\n", time_spent, NB_K);
 
+    /*
+    // Quicksort
     begin = clock();
     printf("\nQuicksort des deux listes:\n");
     quicksort_lists(lm_int, 0, NB_K-1);
@@ -205,7 +161,7 @@ int main(int argc, char const *argv[])  {
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Temps écoulé: %fs for %d keys\n", time_spent, NB_K);
-
+    */
 
     // Free des listes d'entiers
     for(int i = 0 ; i < NB_K ; i++ )  {  
