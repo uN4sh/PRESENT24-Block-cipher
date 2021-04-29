@@ -2,14 +2,19 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <inttypes.h>
 
 #define TAILLE_MOT 7
-#define NB_K 1000000 // 2^24 = 16777216
+#define NB_K 16777216 // 2^24 = 16777216
 
 int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex, char *cipher);
 int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex, char *clair);
 int CHIFFREMENT_DOUBLE(char *message, char *cle_k1, char *cle_k2, char *cipher);
-int CHIFFREMENT2(char *etat_hex, char *cle_maitre_hex, char *cipher);
+
+void CADENCEMENT_CLE_OPTI(uint32_t m_key, uint32_t *sous_cles);
+int CHIFFREMENT_OPTI(uint32_t etat, uint32_t *sous_cles);
+int DECHIFFREMENT_OPTI(uint32_t etat, uint32_t *sous_cles);
+int CHIFFREMENT_DOUBLE_OPTI(uint32_t message, uint32_t k1, uint32_t k2);
 
 /**
  * Attaque par le milieu :
@@ -43,13 +48,47 @@ void genere_listes(char *clair, int **lm_int, char *chiffre, int **lc_int)  {
         lm_int[i][1] = i; 
         // lc_int[i][1] = i;
         snprintf ( k, TAILLE_MOT+1, "%06x", i );
-        lm_int[i][0] =   CHIFFREMENT2(clair  , k, buf);
-        // lc_int[i][0] = DECHIFFREMENT(chiffre, k, buf);
+        lm_int[i][0] =   CHIFFREMENT(clair  , k, buf);
+        lc_int[i][0] = DECHIFFREMENT(chiffre, k, buf);
     }
 }
 
-// Tri des listes ? Par valeurs m / c ? Sont actuellement triées par clés
-void quicksort_lists(int **list, int first, int last)  {
+
+/**
+ * @brief Génère les deux listes Lm et Lc pour tout k parmi 2^24.
+ * 
+ *         [0]   [1]
+ * Lm  Chiffré | Clé
+ * Lc    Clair | Clé
+ * 
+ * @param clair
+ * @param lm_int
+ * @param chiffré
+ * @param lc_int
+ * @return              Les deux listes sont modifiées par la fonction 
+ */
+void GENERER_LISTES_OPTI(uint32_t clair, int **lm_int, uint32_t chiffre, int **lc_int)  { 
+    uint32_t sous_cles[11];
+    for (int i = 0; i < NB_K; i++)  {
+        CADENCEMENT_CLE_OPTI(i, sous_cles);
+        lm_int[i][1] = i; 
+        lc_int[i][1] = i;
+        lm_int[i][0] = CHIFFREMENT_OPTI(clair, sous_cles);
+        lc_int[i][0] = DECHIFFREMENT_OPTI(chiffre, sous_cles);
+    }
+}
+
+
+/**
+ * @brief Algorithme Quicksort: trie le tableau à double entrée par sa valeur (Position 1).
+ *        Les listes sont initialement triées par clés (Position 0) puisque générées par une boucle.
+ * 
+ * @param list      Tableau à trier
+ * @param first     Première position pour l'algorithme diviser pour régner
+ * @param last      Dernière position pour l'algorithme diviser pour régner
+ * @return          Le tableau en paramètre est modifié dans la fonction
+ */
+void QUICKSORT(int **list, int first, int last)  {
     int i, j, pivot;
     int *temp;
 
@@ -73,17 +112,26 @@ void quicksort_lists(int **list, int first, int last)  {
         temp=list[pivot];
         list[pivot]=list[j];
         list[j]=temp;
-        quicksort_lists(list,first,j-1);
-        quicksort_lists(list,j+1,last);
+        QUICKSORT(list,first,j-1);
+        QUICKSORT(list,j+1,last);
     }
 }
 
 
-void research_int(int **lm, int **lc, char *m2, char *c2)  {
+/**
+ * @brief Recherche d'éléments communs parmi les deux listes puis teste les clés candidates 
+ *        avec le second couple (m2, c2) pour retrouver les clés (k1, k2) ayant servi au chiffrement.
+ * 
+ * @param lm
+ * @param lc
+ * @param m2
+ * @param c2
+ * @return      void
+ */
+void RECHERCHE_COMMUNS(int **lm, int **lc, uint32_t m2, uint32_t c2)  {
     int i = 0, j = 0;
     int collisions = 0;
-    char output[TAILLE_MOT-1], k1[TAILLE_MOT-1], k2[TAILLE_MOT-1];
-
+    int res;
     while(i < NB_K && j < NB_K)  {
         if (lc[i][0] < lm[j][0])  {
             i++;
@@ -92,12 +140,9 @@ void research_int(int **lm, int **lc, char *m2, char *c2)  {
             j++;
         }
         else  {
-            // printf("Élément commun: %06x | Clé candidate: (%06x, %06x)\n", lm[j][0], lm[j][1], lc[i][1]);
-            snprintf ( k1, TAILLE_MOT+1, "%06x", lm[i][1] );
-            snprintf ( k2, TAILLE_MOT+1, "%06x", lc[i][1] );
-            CHIFFREMENT_DOUBLE(m2, k1, k2, output);
+            res = CHIFFREMENT_DOUBLE_OPTI(m2, lm[j][1], lc[i][1]);
             collisions++;
-            if (!strcmp(output, c2))  {
+            if (res == c2)  {
                 printf("\033[32mClé fonctionnelle trouvée: %06x (%06x, %06x)\033[0m\n", lm[j][0], lm[j][1], lc[i][1]);
             }
             i++;
@@ -107,10 +152,9 @@ void research_int(int **lm, int **lc, char *m2, char *c2)  {
     printf("Fin de la recherche, %d collisions rencontrées.\n", collisions);
 }
 
+
 // ELYN (m1,c1) = (16a0e6, dcc916) (m2,c2) = (332962,cfeee9)
 // FM   (m1,c1) = (02c315, 88b6ed) (m2,c2) = (1d2dec,c4bb7a)
-// TEST (m1, c1) =  (198ad6, d4fbec), (k1, k2) = (000023, 0000aa) 
-
 int main(int argc, char const *argv[])  {
     // 2 listes en entiers
     int **lm_int = (int ** ) malloc(NB_K * sizeof(int * ));
@@ -120,126 +164,58 @@ int main(int argc, char const *argv[])  {
         lc_int[i] = (int * ) malloc(2 * sizeof(int));
     }
 
+    uint32_t couple_elyn[4] = {0x16a0e6, 0xdcc916, 0x332962, 0xcfeee9};
 
-    char couple_elyn[4][7] = {"16a0e6", "dcc916", "332962", "cfeee9"};
-    // char couple_test[2][7] = {"198ad6", "d4fbec"};
+    clock_t begin, end;
+    double time_spent;
 
-    char *clair = couple_elyn[0];
-    char *chiffre = couple_elyn[1];
-    
-    // Mode listes d'entiers
-    clock_t begin = clock();
-
-    genere_listes(clair, lm_int, chiffre, lc_int);
+    begin = clock();
+    printf("Création des listes Lc et Lm...\n");
+    // genere_listes(clair, lm_int, chiffre, lc_int);
+    GENERER_LISTES_OPTI(couple_elyn[0], lm_int, couple_elyn[1], lc_int);
     printf("              Clair  |   Chiffré\n");
-    printf("    \033[33;1mCouple :  \033[33;1m%s |    %s\033[0m\n\n", clair, chiffre);
-    printf("    \033[34m   Clé |\033[0m Chiffré | Déchiffré\033[0m\n");
+    printf("    \033[33;1mCouple :  \033[33;1m%06x |    %06x\033[0m\n\n", couple_elyn[0], couple_elyn[1]);
+    printf("Lm  \033[34m   Clé |\033[0m Chiffré |  Lc  \033[34m   Clé |\033[0m Déchiffré\033[0m\n");
     for (int i = 0; i < 10; i++)
-        printf("\033[32m%03d: \033[34m%06x |\033[32m  %06x |    %06x\033[00m\n", i, lm_int[i][1], lm_int[i][0], lc_int[i][0]);
-    printf("-\n");
-    printf("\033[32m%02d: \033[34m%06x |\033[32m  %06x |    %06x\033[00m\n", NB_K-1, lm_int[NB_K-1][1], lm_int[NB_K-1][0], lc_int[NB_K-1][0]);
-
-    // Mesure du temps écoulé
-    clock_t end = clock();
-    double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+        printf("\033[32m%02d: \033[34m%06x |\033[32m  %06x |      \033[34m%06x |\033[32m %06x\033[00m\n", i, lm_int[i][1], lm_int[i][0], lc_int[i][1], lc_int[i][0]);
+    printf("\n");
+    // printf("\033[32m%02d: \033[34m%06x |\033[32m  %06x |    %06x\033[00m\n", NB_K-1, lm_int[NB_K-1][1], lm_int[NB_K-1][0], lc_int[NB_K-1][0]);
+    end = clock();
+    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Temps écoulé: %fs for %d keys\n", time_spent, NB_K);
+    
 
-    /*
     // Quicksort
     begin = clock();
     printf("\nQuicksort des deux listes:\n");
-    quicksort_lists(lm_int, 0, NB_K-1);
-    quicksort_lists(lc_int, 0, NB_K-1);
+    QUICKSORT(lm_int, 0, NB_K-1);
+    QUICKSORT(lc_int, 0, NB_K-1);
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Temps écoulé: %fs for %d keys\n", time_spent, NB_K);
-
+    printf("Temps écoulé: %fs for %d keys\n", time_spent, NB_K);    
     
+
+    // Recherche d'éléments communs
     begin = clock();
     printf("\nBegin research:\n");
-    research_int(lm_int, lc_int, couple_elyn[2], couple_elyn[3]);
+    RECHERCHE_COMMUNS(lm_int, lc_int, couple_elyn[2], couple_elyn[3]);
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Temps écoulé: %fs for %d keys\n", time_spent, NB_K);
-    */
+    
 
     // Free des listes d'entiers
+    begin = clock();
+    printf("\nLibération de mémoire des deux listes:\n");
     for(int i = 0 ; i < NB_K ; i++ )  {  
         free(lm_int[i]);
         free(lc_int[i]);
     }
     free(lm_int);
     free(lc_int);
-    
-    return 0;
-}
-
-/*
-// Mode listes de char
-int main(int argc, char const *argv[])  {
-
-    char couple_elyn[2][7] = {"16a0e6", "dcc916"};
-    char couple_test[2][7] = {"198ad6", "d4fbec"};
-
-    char *clair = couple_test[0];
-    char *chiffre = couple_test[1];
-
-    // Listes Lm et Lc : 2^24 colonnes de 2 mots chacunes : (clair | clé) et (chiffré | clé)
-    char *** lm = (char *** ) malloc(NB_K * sizeof(char ** ));
-    char *** lc = (char *** ) malloc(NB_K * sizeof(char ** ));
-
-    // Allocation de mémoire pour les 2 listes
-    for(int i = 0 ; i < NB_K ; i++ )  { 
-        lm[i] = (char ** ) malloc(2 * sizeof(char * )) ;
-        lc[i] = (char ** ) malloc(2 * sizeof(char * )) ;
-        for ( int j = 0 ; j < 2 ; j++ )  { 
-            lm[i][j] = (char *) malloc (TAILLE_MOT * sizeof(char));
-            lc[i][j] = (char *) malloc (TAILLE_MOT * sizeof(char));
-        }
-    }
-  
-    
-    clock_t begin = clock();
-
-    genere_listes(clair, lm, chiffre, lc);
-    printf("              Clair  |   Chiffré\n");
-    printf("    \033[33;1mCouple :  \033[33;1m%s |    %s\033[0m\n\n", clair, chiffre);
-    printf("    \033[34m   Clé |\033[0m Chiffré | Déchiffré\033[0m\n");
-    for (int i = 0; i < 10; i++)
-        printf("\033[32m%03d: \033[34m%s |\033[32m  %s |    %s\033[00m\n", i, lm[i][1], lm[i][0], lc[i][0]);
-    printf("-\n");
-    printf("\033[32m%02d: \033[34m%s |\033[32m  %s |    %s\033[00m\n", NB_K-1, lm[NB_K-1][1], lm[NB_K-1][0], lc[NB_K-1][0]);
-    
-    // Mesure du temps écoulé
-    clock_t end = clock();
-    double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Temps écoulé: %fs for %d keys\n", time_spent, NB_K);
-
-
-    begin = clock();
-    printf("\nBegin research:\n");
-    research(lm, lc, "332962", "cfeee9");
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Temps écoulé: %fs for %d keys\n", time_spent, NB_K);
     
-
-    // Libération de la mémoire des deux listes
-    for(int i = 0 ; i < NB_K ; i++ )  {  
-        for ( int j = 0 ; j < 2 ; j++ )  { 
-            free(lm[i][j]);
-            free(lc[i][j]);
-        } 
-    }
-
-    for(int i = 0 ; i < NB_K ; i++ )  {  
-        free(lm[i]);
-        free(lc[i]);
-    }
-
-    free(lm);
-    free(lc);
-
     return 0;
 }
-*/
