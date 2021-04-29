@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
 #include <time.h>
 
 #define TAILLE_MOT 6
@@ -9,7 +10,10 @@ int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex, char *cipher);
 int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex, char *clair);
 int CHIFFREMENT_DOUBLE(char *message, char *cle_k1, char *cle_k2, char *cipher);
 int DECHIFFREMENT_DOUBLE(char *cipher, char *cle_k1, char *cle_k2, char *message);
-int CHIFFREMENT2(char *etat_hex, char *cle_maitre_hex, char *cipher);
+
+void CADENCEMENT_CLE_OPTI(uint32_t m_key, uint32_t *sous_cles);
+int CHIFFREMENT_OPTI(uint32_t etat, uint32_t *sous_cles, char *cipher);
+int CHIFFREMENT_DOUBLE_OPTI(uint32_t message, uint32_t k1, uint32_t k2);
 
 int main(int argc, char const *argv[])  { 
     // Vecteurs de test pour le chiffrement
@@ -18,16 +22,21 @@ int main(int argc, char const *argv[])  {
                                              {"000000", "ffffff", "1b56ce"},
                                              {"f955b9", "d1bd2d", "47a929"} };
 
+    uint32_t vecteurs_int[4][3] = { {0x000000, 0x000000, 0xbb57e6},
+                                     {0xffffff, 0x000000, 0x739293},
+                                     {0x000000, 0xffffff, 0x1b56ce},
+                                     {0xf955b9, 0xd1bd2d, 0x47a929} };
+    
+    
     char res_chiffre[TAILLE_MOT+1];
     printf("\033[33mAncien chiffrement:\n\033[00m");
     clock_t begin = clock();
-    for (int i = 0; i < 1000000; i++)  {
-        // Chiffrement ancien
-        CHIFFREMENT(vecteurs_test[0][0], vecteurs_test[0][1], res_chiffre);
-        // if (!strcmp(vecteurs_test[i][2], res_chiffre))
-        //     printf("\033[32mPassed: %s | %s | %s\033[00m\n", vecteurs_test[i][0], vecteurs_test[i][1], vecteurs_test[i][2]);
-        // else
-        //     printf("\033[31mFailed: %s | %s | %s || %s\033[00m\n", vecteurs_test[i][0], vecteurs_test[i][1], vecteurs_test[i][2], res_chiffre);
+    for (int i = 0; i < 4; i++)  {
+        CHIFFREMENT(vecteurs_test[i][0], vecteurs_test[i][1], res_chiffre);
+        if (!strcmp(vecteurs_test[i][2], res_chiffre))
+            printf("\033[32mPassed: %s | %s | %s\033[00m\n", vecteurs_test[i][0], vecteurs_test[i][1], vecteurs_test[i][2]);
+        else
+            printf("\033[31mFailed: %s | %s | %s || %s\033[00m\n", vecteurs_test[i][0], vecteurs_test[i][1], vecteurs_test[i][2], res_chiffre);
     }
     clock_t end = clock();
     double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
@@ -36,19 +45,28 @@ int main(int argc, char const *argv[])  {
 
     begin = clock();
     printf("\033[33mNouveau chiffrement:\n\033[00m");
-    for (int i = 0; i < 1000000; i++)  {
-        CHIFFREMENT2(vecteurs_test[0][0], vecteurs_test[0][1], res_chiffre);
+    uint32_t res;
+    uint32_t sous_cles[11];
+    for (int i = 0; i < 1700000; i++)  {
+        // Génération des 11 sous clés de 24 bits chacune via algo. cadencement de clés
+        CADENCEMENT_CLE_OPTI(vecteurs_int[0][1], sous_cles);
+        res = CHIFFREMENT_OPTI(vecteurs_int[0][0], sous_cles, res_chiffre);
+        // if (res == vecteurs_int[i][2])
+        //     printf("\033[32mPassed: %06x | %06x | %06x\033[00m\n", vecteurs_int[i][0], vecteurs_int[i][1], vecteurs_int[i][2]);
+        // else
+        //     printf("\033[31mFailed: %06x | %06x | %06x || %06x\033[00m\n", vecteurs_int[i][0], vecteurs_int[i][1], vecteurs_int[i][2], res);
+    
     }
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Temps écoulé: %f seconds\n", time_spent);
     
 
-    /*   
+    
 
     // Chaînes de sortie des chiffrements et déchiffrements
     char res_clair[TAILLE_MOT+1];
-    char res_chiffre[TAILLE_MOT+1];
+    // char res_chiffre[TAILLE_MOT+1];
 
     printf("\033[33mChiffrement - Vecteurs de test:\n\033[00m");
     printf("        Clair  |  Clé   | Cipher\n");
@@ -87,19 +105,8 @@ int main(int argc, char const *argv[])  {
             printf("\033[31mFailed: %s | %s | \033[34m%s | \033[35m%s\033[00m\n", clairs[i][0], clairs[i][1], res_chiffre, res_clair);
     }
 
-    printf("\n\033[33mChiffrement double puis déchiffrement double de messages quelconques:\n\033[00m");
-
-    printf("        Clair  |  Clé1  |  Clé2  | \033[34mCipher\033[0m | \033[35mDéchiffré\033[0m\n");
-    for (size_t i = 0; i < 3; i++)  {
-        CHIFFREMENT_DOUBLE(clairs[i][0], clairs[i][1], clairs[i][2], res_chiffre);
-        DECHIFFREMENT_DOUBLE(res_chiffre, clairs[i][1], clairs[i][2], res_clair);
-
-        if (!strcmp(clairs[i][0], res_clair))
-            printf("\033[32mPassed: %s | %s | %s | \033[34m%s | \033[35m%s\033[00m\n", clairs[i][0], clairs[i][1], clairs[i][2], res_chiffre, res_clair);
-        else
-            printf("\033[31mFailed: %s | %s | %s | \033[34m%s | \033[35m%s\033[00m\n", clairs[i][0], clairs[i][1], clairs[i][2], res_chiffre, res_clair);
-    }
-    */
+    
+    
     
     return 0;
 }

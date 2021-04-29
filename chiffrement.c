@@ -65,12 +65,13 @@ void substitution_4_bits(char *bits, int *s)  {
  * S[x] c 5 6 b 9 0 a d 3 e f 8 4 7 1 2
  */ 
 void SUBSTITUTION(char *etat, int *s)  {
-    char substr[4];
+    char substr[5];
     for (size_t i = 0; i < TAILLE_MSG; i+=4)  {
         // Récupération des 4 bits
         for (size_t j = 0; j < 4; j++)
             substr[j] = etat[i+j];
-        
+        substr[4] = '\0';
+
         // Substitution des 4 bits selon la Boite-S
         substitution_4_bits(substr, s);
 
@@ -145,7 +146,7 @@ uint32_t PERMUTATION_OPTI(uint32_t etat, int *p)  {
     int i;
     for (i=0; i<24; i++){
         int distance = 23 - i;
-        permutation = permutation | ((etat >> distance & 0x1) << 23 - p[i]);
+        permutation = permutation | ((etat >> distance & 0x1) << (23 - p[i]));
     }
     return permutation;
 }
@@ -178,9 +179,7 @@ void cadencement_cle(char *cle_maitre, char sous_cles[][25])  {
             k++;
         }
         sous_cles[i][24] = '\0';
-        // Opti.: Faire un masque avec un & pour extraire les 24 bits
-        // Exp : 000000000000000000000000000000011111111111111111111000000000000
-
+        
         // Mise à jour du registre K en 3 étapes
             // Step 1: Rotation du registre de 61 bits vers la gauche -> [k18k17..k0k79..k20k19]
         k = 0;
@@ -199,18 +198,13 @@ void cadencement_cle(char *cle_maitre, char sous_cles[][25])  {
         
         strcpy( K, substr_s1_1 );
         strcat( K, substr_s1_2 );
-        // Opti.: Récupérer via masque les bits 18 à 0
-        //        Shifter les bits 79-19
-        //        Replacer les 18 à 0 au début (Comment ?)
-        
-            
             // Step 2: Application de la Boîte-S aux bits 79-76
         for (size_t j = 0; j < 4; j++)
             substr_s2[j] = K[j];
         
         substr_s2[k] = '\0';
         substitution_4_bits(substr_s2, s);
-        
+
         for (size_t j = 0; j < 4; j++)
             K[j] = substr_s2[j];
         
@@ -337,6 +331,5 @@ int CHIFFREMENT_DOUBLE_OPTI(uint32_t message, uint32_t k1, uint32_t k2)  {
     uint32_t sous_cles_k2[11];
     CADENCEMENT_CLE_OPTI(k1, sous_cles_k1);
     CADENCEMENT_CLE_OPTI(k2, sous_cles_k2);
-    int res;
     return CHIFFREMENT_OPTI(CHIFFREMENT_OPTI(message, sous_cles_k1), sous_cles_k2);
 }
