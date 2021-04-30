@@ -7,9 +7,9 @@
 #define TAILLE_MOT 7
 #define NB_K 16777216 // 2^24 = 16777216
 
-int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex, char *cipher);
-int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex, char *clair);
-int CHIFFREMENT_DOUBLE(char *message, char *cle_k1, char *cle_k2, char *cipher);
+// int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex, char *cipher);
+// int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex, char *clair);
+// int CHIFFREMENT_DOUBLE(char *message, char *cle_k1, char *cle_k2, char *cipher);
 
 void CADENCEMENT_CLE_OPTI(uint32_t m_key, uint32_t *sous_cles);
 int CHIFFREMENT_OPTI(uint32_t etat, uint32_t *sous_cles);
@@ -22,25 +22,32 @@ int CHIFFREMENT_DOUBLE_OPTI(uint32_t message, uint32_t k1, uint32_t k2);
  * 
  * Nombre de clés : 
  * // DES : longueur de la clé : 56 bits, nombre de clés : 2^56
- * // PRESENT-24 : 6 caractères, alphabet de 16 possibles, 24 bits -> 2^24 ?
+ * // PRESENT-24 : longueur de la clé : 24 bits -> 2^24 = 16777216
  * 
  *  1. Construire deux listes Lc et Lm tel que :
  *      Pour tout k parmi 2^24, stocker le résultat du   chiffrement de m dans Lm  (chiffré | clé) 
- *      Pour tout k parmi 2^24, stocker le résultat du déchiffrement de c dans Lc  (clair | clé) 
+ *      Pour tout k parmi 2^24, stocker le résultat du déchiffrement de c dans Lc  (clair   | clé) 
  * 
- *  2. Chercher les éléments communs dans les deux listes :
- *      t tel que : .... 
+ *  2. Chercher les éléments communs dans les deux listes t tel quel :
+ *      t = PRESENT   (m1)
+ *      t = PRESENT-1 (c1)
  *      Méthode :
  *          - Trier les deux listes - O(2 * n*log n)
  *          - Chercher les éléments communs - O(n)
  *          Avec n = 2^24
- *  
+ * 
+ *  3. Pour chaque élément commun des deux listes :
+ *      - Récupérer le couple de clé k1, k2
+ *      - Chiffrer m2 avec 2-PRESENT24 et vérifier s'il est égal à c2
+ *      - Si oui : le couple de clé k1, k2 est le couple fonctionnel
+ *      - Si non : c'est une collision
+ * 
  *  Taille en mémoire : 2 listes de 2^24 -> 2^25 en mémoire
  *  Taille en temps :   2 * 2^24 * log(2^24) = 2 * 24 * 2^24 = 48 * 2^24
  */
 
 
-
+/*
 void genere_listes(char *clair, int **lm_int, char *chiffre, int **lc_int)  { 
     char buf[TAILLE_MOT+1];
     char k[TAILLE_MOT+1];
@@ -52,6 +59,7 @@ void genere_listes(char *clair, int **lm_int, char *chiffre, int **lc_int)  {
         lc_int[i][0] = DECHIFFREMENT(chiffre, k, buf);
     }
 }
+*/
 
 
 /**
@@ -152,10 +160,22 @@ void RECHERCHE_COMMUNS(int **lm, int **lc, uint32_t m2, uint32_t c2)  {
     printf("Fin de la recherche, %d collisions rencontrées.\n", collisions);
 }
 
+void print_listes(int **lm_int, int **lc_int, uint32_t m1, uint32_t c1)  {
+    printf("              Clair  |   Chiffré\n");
+    printf("    \033[33;1mCouple :  \033[33;1m%06x |    %06x\033[0m\n\n", m1, c1);
+    printf("Lm  \033[34m   Clé |\033[0m Chiffré |  Lc  \033[34m   Clé |\033[0m Déchiffré\033[0m\n");
+    for (int i = 0; i < 10; i++)
+        printf("\033[32m%02d: \033[34m%06x |\033[32m  %06x |      \033[34m%06x |\033[32m %06x\033[00m\n", i, lm_int[i][1], lm_int[i][0], lc_int[i][1], lc_int[i][0]);
+    printf("\n");
+    printf("\033[32m%02d: \033[34m%06x |\033[32m  %06x |    %06x\033[00m\n", NB_K-1, lm_int[NB_K-1][1], lm_int[NB_K-1][0], lc_int[NB_K-1][0]);
+}
+
 
 // ELYN (m1,c1) = (16a0e6, dcc916) (m2,c2) = (332962,cfeee9)
 // FM   (m1,c1) = (02c315, 88b6ed) (m2,c2) = (1d2dec,c4bb7a)
 int main(int argc, char const *argv[])  {
+    clock_t tot_begin = clock();
+
     // 2 listes en entiers
     int **lm_int = (int ** ) malloc(NB_K * sizeof(int * ));
     int **lc_int = (int ** ) malloc(NB_K * sizeof(int * ));
@@ -165,6 +185,8 @@ int main(int argc, char const *argv[])  {
     }
 
     uint32_t couple_elyn[4] = {0x16a0e6, 0xdcc916, 0x332962, 0xcfeee9};
+    uint32_t m1 = couple_elyn[0];
+    uint32_t c1 = couple_elyn[1];
 
     clock_t begin, end;
     double time_spent;
@@ -172,14 +194,8 @@ int main(int argc, char const *argv[])  {
     begin = clock();
     printf("Création des listes Lc et Lm...\n");
     // genere_listes(clair, lm_int, chiffre, lc_int);
-    GENERER_LISTES_OPTI(couple_elyn[0], lm_int, couple_elyn[1], lc_int);
-    printf("              Clair  |   Chiffré\n");
-    printf("    \033[33;1mCouple :  \033[33;1m%06x |    %06x\033[0m\n\n", couple_elyn[0], couple_elyn[1]);
-    printf("Lm  \033[34m   Clé |\033[0m Chiffré |  Lc  \033[34m   Clé |\033[0m Déchiffré\033[0m\n");
-    for (int i = 0; i < 10; i++)
-        printf("\033[32m%02d: \033[34m%06x |\033[32m  %06x |      \033[34m%06x |\033[32m %06x\033[00m\n", i, lm_int[i][1], lm_int[i][0], lc_int[i][1], lc_int[i][0]);
-    printf("\n");
-    // printf("\033[32m%02d: \033[34m%06x |\033[32m  %06x |    %06x\033[00m\n", NB_K-1, lm_int[NB_K-1][1], lm_int[NB_K-1][0], lc_int[NB_K-1][0]);
+    GENERER_LISTES_OPTI(m1, lm_int, c1, lc_int);
+    // print_listes(lm_int, lc_int, m1, c1);
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Temps écoulé: %fs for %d keys\n", time_spent, NB_K);
@@ -216,6 +232,7 @@ int main(int argc, char const *argv[])  {
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Temps écoulé: %fs for %d keys\n", time_spent, NB_K);
-    
+
+    printf("\n\033[31mTemps total écoulé: %fs for %d keys\n\033[0m", (double)(clock() - tot_begin) / CLOCKS_PER_SEC, NB_K);
     return 0;
 }
