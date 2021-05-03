@@ -47,21 +47,6 @@ int CHIFFREMENT_DOUBLE_OPTI(uint32_t message, uint32_t k1, uint32_t k2);
  */
 
 
-/*
-void genere_listes(char *clair, int **lm_int, char *chiffre, int **lc_int)  { 
-    char buf[TAILLE_MOT+1];
-    char k[TAILLE_MOT+1];
-    for (int i = 0; i < NB_K; i++)  {
-        lm_int[i][1] = i; 
-        // lc_int[i][1] = i;
-        snprintf ( k, TAILLE_MOT+1, "%06x", i );
-        lm_int[i][0] =   CHIFFREMENT(clair  , k, buf);
-        lc_int[i][0] = DECHIFFREMENT(chiffre, k, buf);
-    }
-}
-*/
-
-
 /**
  * @brief Génère les deux listes Lm et Lc pour tout k parmi 2^24.
  * 
@@ -190,17 +175,16 @@ int main(int argc, char const *argv[])  {
 
     clock_t begin, end;
     double time_spent;
-
+    
     begin = clock();
     printf("Création des listes Lc et Lm...\n");
-    // genere_listes(clair, lm_int, chiffre, lc_int);
     GENERER_LISTES_OPTI(m1, lm_int, c1, lc_int);
-    // print_listes(lm_int, lc_int, m1, c1);
+    print_listes(lm_int, lc_int, m1, c1);
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Temps écoulé: %fs for %d keys\n", time_spent, NB_K);
     
-
+    
     // Quicksort
     begin = clock();
     printf("\nQuicksort des deux listes:\n");
@@ -229,6 +213,7 @@ int main(int argc, char const *argv[])  {
     }
     free(lm_int);
     free(lc_int);
+    
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Temps écoulé: %fs for %d keys\n", time_spent, NB_K);
@@ -236,3 +221,81 @@ int main(int argc, char const *argv[])  {
     printf("\n\033[31mTemps total écoulé: %fs for %d keys\n\033[0m", (double)(clock() - tot_begin) / CLOCKS_PER_SEC, NB_K);
     return 0;
 }
+
+
+
+
+
+
+
+/* ****************************
+ *    MODE HASHMAP TEST       *
+ *****************************/
+
+/*
+typedef struct  {
+    int nbr;
+    int *keys;
+} lm_data;
+
+void GENERER_LISTES_TEST(uint32_t clair, lm_data *lm)  { 
+    uint32_t sous_cles[11];
+    uint32_t res;
+    for (int i = 0; i < NB_K; i++)  {
+        CADENCEMENT_CLE_OPTI(i, sous_cles);
+        res = CHIFFREMENT_OPTI(clair, sous_cles);
+        lm[res].nbr += 1;
+        lm[res].keys = (int *) realloc( lm[res].keys, lm[res].nbr * sizeof(int) );
+        lm[res].keys[lm[res].nbr-1] = i;
+    }
+}
+
+void RECHERCHE_TEST(lm_data *lm, uint32_t c1, uint32_t m2, uint32_t c2)  {
+    uint32_t sous_cles[11];
+    uint32_t res, res2;
+    int collisions = 0;
+    int end = 0;
+    for (int i = 0; i < NB_K; i++)  {
+        CADENCEMENT_CLE_OPTI(i, sous_cles);
+        res = DECHIFFREMENT_OPTI(c1, sous_cles);
+        if (lm[res].nbr > 0)  {
+            for (int j = 0; j < lm[res].nbr; j++)  {
+                // Chaque clé k1 de lm
+                res2 = CHIFFREMENT_DOUBLE_OPTI(m2, lm[res].keys[j], i);
+                collisions++;
+                if (res2 == c2)  {
+                    printf("\033[32mClé fonctionnelle trouvée: %06x (%06x, %06x)\033[0m\n", res, lm[res].keys[j], i);
+                    // end = 1;
+                    // break;
+                }
+            }
+        }
+        // if (end)
+        //     break;
+    }
+}
+
+int main(int argc, char const *argv[])  {
+    lm_data *lm = (lm_data * ) malloc(NB_K * sizeof(lm_data));
+
+    uint32_t couple_elyn[4] = {0x16a0e6, 0xdcc916, 0x332962, 0xcfeee9};
+    uint32_t m1 = couple_elyn[0];
+    uint32_t c1 = couple_elyn[1];
+
+    printf("Création de la liste Lm...\n");
+    for (size_t i = 0; i < NB_K; i++)  {
+        lm[i].nbr = 0;
+        lm[i].keys = (int *) malloc( sizeof(int) );
+    }
+    GENERER_LISTES_TEST(m1, lm);
+
+
+    printf("\nDéchiffrement et recherche de clé(s) fonctionnelle(s)...\n");
+    RECHERCHE_TEST(lm, c1, couple_elyn[2], couple_elyn[3]);
+
+
+    for(int i = 0 ; i < NB_K ; i++ ) 
+        free(lm[i].keys);
+    free(lm);
+}
+*/

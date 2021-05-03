@@ -57,13 +57,6 @@ void substitution_4_bits(char *bits, int *s)  {
     decimal_to_binary(decvalue, bits, 5);
 }
 
-
-/**
- * @brief Couche non linéaire du chiffrement : substitution 4 bits par 4 selon la boîte-S.
- * 
- * x    0 1 2 3 4 5 6 7 8 9 a b c d e f
- * S[x] c 5 6 b 9 0 a d 3 e f 8 4 7 1 2
- */ 
 void SUBSTITUTION(char *etat, int *s)  {
     char substr[5];
     for (size_t i = 0; i < TAILLE_MSG; i+=4)  {
@@ -81,15 +74,6 @@ void SUBSTITUTION(char *etat, int *s)  {
     }
 }
 
-/**
- * @brief Couche linéaire du chiffrement : permutation bit-à-bit selon la table P.
- * 
- *  i    0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
- *  P(i) 0  6 12 18  1  7 13 19  2  8 14 20  3  9 15 21  4 10 16 22  5 11 17 23
- * 
- * @param etat  Registre de 24 bits contenant l'état (chaine binaire)
- * @return      La variable état est modifiée, permuté bit-à-bit 
- */ 
 void PERMUTATION(char *etat, int *p)  {
     
     char tmp[TAILLE_MSG+1];
@@ -103,7 +87,20 @@ void PERMUTATION(char *etat, int *p)  {
     }
 }
 
+/* ****************************
+ *      OPTIMISATIONS         *
+ *****************************/
 
+/**
+ * @brief Couche non linéaire du chiffrement : substitution 4 bits par 4 selon la boîte-S.
+ * 
+ * x    0 1 2 3 4 5 6 7 8 9 a b c d e f
+ * S[x] c 5 6 b 9 0 a d 3 e f 8 4 7 1 2
+ * 
+ * @param etat  Registre de 24 bits contenant l'état (chaine binaire)
+ * @param s     La Boîte-S de substitution afin de déchiffrer avec la boîte inversée
+ * @return      Registre de 24 bits contenant l'état substitué 
+ */ 
 uint32_t SUBSTITUTION_OPTI(uint32_t etat, int *s)  {
     // Step 2: Application de la Boîte-S aux bits 4 à 4 
 
@@ -114,32 +111,37 @@ uint32_t SUBSTITUTION_OPTI(uint32_t etat, int *s)  {
 
     // Extraire les 4 deuxièmes :
     tmp = (etat >> 16) & 0x0F;
-    etat = etat & 0xF0FFFF;
-    etat = etat | ((uint64_t)s[tmp] << 16);
+    etat = (etat & 0xF0FFFF) | ((uint64_t)s[tmp] << 16);
     
     // Extraire les 4 3eme
     tmp = (etat >> 12) & 0x00F;
-    etat = etat & 0xFF0FFF;
-    etat = etat | ((uint64_t)s[tmp] << 12);
+    etat = (etat & 0xFF0FFF) | ((uint64_t)s[tmp] << 12);
 
     // Extraire les 4 4eme
     tmp = (etat >> 8) & 0x000F;
-    etat = etat & 0xFFF0FF;
-    etat = etat | ((uint64_t)s[tmp] << 8);
+    etat = (etat & 0xFFF0FF) | ((uint64_t)s[tmp] << 8);
 
      // Extraire les 4 5eme
     tmp = (etat >> 4) & 0x0000F;
-    etat = etat & 0xFFFF0F;
-    etat = etat | ((uint64_t)s[tmp] << 4);
+    etat = (etat & 0xFFFF0F) | ((uint64_t)s[tmp] << 4);
 
     // Extraire les 4 derniers
     tmp = etat & 0x00000F;
-    etat = etat & 0xFFFFF0;
-    etat = etat | s[tmp];
+    etat = (etat & 0xFFFFF0) | s[tmp];
 
     return etat;
 }
 
+/**
+ * @brief Couche linéaire du chiffrement : permutation bit-à-bit selon la table P.
+ * 
+ *  i    0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
+ *  P(i) 0  6 12 18  1  7 13 19  2  8 14 20  3  9 15 21  4 10 16 22  5 11 17 23
+ * 
+ * @param etat  Registre de 24 bits contenant l'état (chaine binaire)
+ * @param p     La table P de permutation afin de déchiffrer avec la table inversée
+ * @return      Registre de 24 bits contenant l'état permuté bit-à-bit 
+ */ 
 uint32_t PERMUTATION_OPTI(uint32_t etat, int *p)  {
     // À expliquer
     uint64_t permutation = 0;
@@ -295,21 +297,25 @@ int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex, char *cipher)  {
     return result;
 }
 
+
 int CHIFFREMENT_OPTI(uint32_t etat, uint32_t *sous_cles)  {
     for (size_t i = 0; i < 10; i++)  {
+        /*
         // Etat ← Etat ⊕ K_i
         etat = etat ^ sous_cles[i];
         // Substitution et permutation de l'état
         etat = SUBSTITUTION_OPTI(etat, s);
-        // decimal_to_binary(etat, tmp, 25);
         etat = PERMUTATION_OPTI(etat, p);
+        */
+
+        etat = PERMUTATION_OPTI(SUBSTITUTION_OPTI((etat ^ sous_cles[i]), s), p);
     }
 
     // Etat ← Etat ⊕ K_11
-    etat = etat ^ sous_cles[10];
+    // etat = etat ^ sous_cles[10];
 
     // Message chiffré retourné après 10 tours d'algorithme
-    return etat;
+    return etat ^ sous_cles[10];
 }
 
 
@@ -319,13 +325,8 @@ int CHIFFREMENT_OPTI(uint32_t etat, uint32_t *sous_cles)  {
  * @param message   Message clair à chiffrer
  * @param cle_k1    Clé k1 pour le chiffrement du message
  * @param cle_k2    Clé k2 pour le second chiffrement
- * @param cipher    Résultat du chiffrement double 2PRESENT24
+ * @return          Résultat du chiffrement double 2PRESENT24
  */
-int CHIFFREMENT_DOUBLE(char *message, char *cle_k1, char *cle_k2, char *cipher)  {
-    CHIFFREMENT(message, cle_k1, cipher);
-    return CHIFFREMENT(cipher, cle_k2, cipher);
-}
-
 int CHIFFREMENT_DOUBLE_OPTI(uint32_t message, uint32_t k1, uint32_t k2)  {
     uint32_t sous_cles_k1[11];
     uint32_t sous_cles_k2[11];

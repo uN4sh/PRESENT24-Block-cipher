@@ -8,12 +8,10 @@
 
 int CHIFFREMENT(char *etat_hex, char *cle_maitre_hex, char *cipher);
 int DECHIFFREMENT(char *chiffre_hex, char *cle_maitre_hex, char *clair);
-int CHIFFREMENT_DOUBLE(char *message, char *cle_k1, char *cle_k2, char *cipher);
-int DECHIFFREMENT_DOUBLE(char *cipher, char *cle_k1, char *cle_k2, char *message);
 
 void CADENCEMENT_CLE_OPTI(uint32_t m_key, uint32_t *sous_cles);
-int CHIFFREMENT_OPTI(uint32_t etat, uint32_t *sous_cles, char *cipher);
-int CHIFFREMENT_DOUBLE_OPTI(uint32_t message, uint32_t k1, uint32_t k2);
+int  CHIFFREMENT_OPTI(uint32_t etat, uint32_t *sous_cles);
+int  CHIFFREMENT_DOUBLE_OPTI(uint32_t message, uint32_t k1, uint32_t k2);
 
 int main(int argc, char const *argv[])  { 
     // Vecteurs de test pour le chiffrement
@@ -27,10 +25,12 @@ int main(int argc, char const *argv[])  {
                                      {0x000000, 0xffffff, 0x1b56ce},
                                      {0xf955b9, 0xd1bd2d, 0x47a929} };
     
+    clock_t begin, end;
+    double time_spent;
     
     char res_chiffre[TAILLE_MOT+1];
     printf("\033[33mAncien chiffrement:\n\033[00m");
-    clock_t begin = clock();
+    begin = clock();
     for (int i = 0; i < 4; i++)  {
         CHIFFREMENT(vecteurs_test[i][0], vecteurs_test[i][1], res_chiffre);
         if (!strcmp(vecteurs_test[i][2], res_chiffre))
@@ -38,19 +38,20 @@ int main(int argc, char const *argv[])  {
         else
             printf("\033[31mFailed: %s | %s | %s || %s\033[00m\n", vecteurs_test[i][0], vecteurs_test[i][1], vecteurs_test[i][2], res_chiffre);
     }
-    clock_t end = clock();
-    double time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
+    end = clock();
+    time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
     printf("Temps écoulé: %f seconds\n", time_spent);
+    
 
-
-    begin = clock();
     printf("\033[33mNouveau chiffrement:\n\033[00m");
+    size_t MAX = 2 ;
     uint32_t res;
     uint32_t sous_cles[11];
-    for (int i = 0; i < 1700000; i++)  {
+    begin = clock();
+    for (int i = 0; i < MAX; i++)  {
         // Génération des 11 sous clés de 24 bits chacune via algo. cadencement de clés
-        CADENCEMENT_CLE_OPTI(vecteurs_int[0][1], sous_cles);
-        res = CHIFFREMENT_OPTI(vecteurs_int[0][0], sous_cles, res_chiffre);
+        CADENCEMENT_CLE_OPTI(i, sous_cles);
+        res = CHIFFREMENT_OPTI(vecteurs_int[0][0], sous_cles);
         // if (res == vecteurs_int[i][2])
         //     printf("\033[32mPassed: %06x | %06x | %06x\033[00m\n", vecteurs_int[i][0], vecteurs_int[i][1], vecteurs_int[i][2]);
         // else
@@ -59,11 +60,10 @@ int main(int argc, char const *argv[])  {
     }
     end = clock();
     time_spent = (double)(end - begin) / CLOCKS_PER_SEC;
-    printf("Temps écoulé: %f seconds\n", time_spent);
+    printf("Temps écoulé: %f secondes pour %ld de chiffrements\n", time_spent, MAX);
     
 
     
-
     // Chaînes de sortie des chiffrements et déchiffrements
     char res_clair[TAILLE_MOT+1];
     // char res_chiffre[TAILLE_MOT+1];
@@ -104,8 +104,6 @@ int main(int argc, char const *argv[])  {
         else
             printf("\033[31mFailed: %s | %s | \033[34m%s | \033[35m%s\033[00m\n", clairs[i][0], clairs[i][1], res_chiffre, res_clair);
     }
-
-    
     
     
     return 0;
