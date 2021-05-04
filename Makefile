@@ -19,17 +19,17 @@ compil_attaque: attaque.o chiffrement.o dechiffrement.o
 
 
 # Compilation objet
-attaque.o: attaque.c chiffrement.c dechiffrement.c
-	gcc -O3 -Wall -pg -g -c -o attaque.o attaque.c 
+attaque.o: src/attaque.c src/chiffrement.c src/dechiffrement.c
+	gcc -O3 -Wall -pg -g -c -o attaque.o src/attaque.c 
 
-main.o: main.c chiffrement.c dechiffrement.c
-	gcc -O3 -Wall -pg -g -c -o main.o main.c 
+main.o: src/main.c src/chiffrement.c src/dechiffrement.c
+	gcc -O3 -Wall -pg -g -c -o main.o src/main.c 
 
-chiffrement.o: chiffrement.c 
-	gcc -O3 -Wall -pg -g -c -o chiffrement.o chiffrement.c
+chiffrement.o: src/chiffrement.c 
+	gcc -O3 -Wall -pg -g -c -o chiffrement.o src/chiffrement.c
 
-dechiffrement.o: dechiffrement.c chiffrement.c
-	gcc -O3 -Wall -pg -g -c -o dechiffrement.o dechiffrement.c
+dechiffrement.o: src/dechiffrement.c src/chiffrement.c
+	gcc -O3 -Wall -pg -g -c -o dechiffrement.o src/dechiffrement.c
 
 
 # Utilitaire
@@ -37,3 +37,4 @@ clean:
 	rm -f dm_crypto
 	rm -f dm_crypto_attaque
 	rm -f *.o
+	rm -f gmon.out
