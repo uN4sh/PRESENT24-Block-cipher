@@ -129,7 +129,6 @@ conteneur RECHERCHE_COMMUNS(int **lm, int **lc, uint32_t m2, uint32_t c2)  {
     int collisions = 0;
     int res;
 
-    // conteneur *to_return = (conteneur * ) malloc(1 * sizeof(conteneur));
     conteneur to_return;
     to_return.nbr = 0;
     to_return.cles = (couple * ) malloc(to_return.nbr * sizeof(couple));
@@ -163,8 +162,8 @@ void print_listes(int **l_lm, int **l_lc)  {
     printf("Lm  \033[34m   Clé |\033[0m Chiffré |  Lc  \033[34m   Clé |\033[0m Déchiffré\033[0m\n");
     for (int i = 0; i < 10; i++)
         printf("\033[00;3m%02d: \033[34m%06x |\033[00;3m  %06x |      \033[34m%06x |\033[00;3m %06x\033[00m\n", i, l_lm[i][1], l_lm[i][0], l_lc[i][1], l_lc[i][0]);
-    printf("- - -\n");
-    printf("\033[00;3m%02d: \033[34m%06x |\033[00;3m  %06x |    %06x\033[00m\n", NB_K-1, l_lm[NB_K-1][1], l_lm[NB_K-1][0], l_lc[NB_K-1][0]);
+    // printf("- - -\n");
+    // printf("\033[00;3m%02d: \033[34m%06x |\033[00;3m  %06x |    %06x\033[00m\n", NB_K-1, l_lm[NB_K-1][1], l_lm[NB_K-1][0], l_lc[NB_K-1][0]);
 }
 
 
@@ -229,15 +228,14 @@ int main(int argc, char const *argv[])  {
 
     // Free des listes d'entiers
     begin = clock();
-    printf("\nLibération de mémoire des deux listes...\n");
+    // printf("\nLibération de mémoire des deux listes...\n");
     for(int i = 0 ; i < NB_K ; i++ )  {  
         free(l_lm[i]);
         free(l_lc[i]);
     }
     free(l_lm);
     free(l_lc);
-    
-    printf("    Temps écoulé: %fs pour %d clés\n", (double)(clock() - begin) / CLOCKS_PER_SEC, NB_K);
+    // printf("    Temps écoulé: %fs pour %d clés\n", (double)(clock() - begin) / CLOCKS_PER_SEC, NB_K);
 
     printf("\n\033[33mTemps total écoulé: %fs pour %d clés\n\033[0m", (double)(clock() - tot_begin) / CLOCKS_PER_SEC, NB_K);
     return 0;
