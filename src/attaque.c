@@ -122,7 +122,7 @@ typedef struct {
  * @param lc    Liste Lc des couples (clair,   clé)
  * @param m2    Message clair   m2 du couple en données
  * @param c2    Message chiffré c2 du couple en données
- * @return      void
+ * @return      Structure conteneur des couples de clés fonctionnelles 
  */
 conteneur RECHERCHE_COMMUNS(int **lm, int **lc, uint32_t m2, uint32_t c2)  {
     int i = 0, j = 0;
@@ -149,8 +149,16 @@ conteneur RECHERCHE_COMMUNS(int **lm, int **lc, uint32_t m2, uint32_t c2)  {
                 to_return.cles[to_return.nbr-1].k2 = lc[i][1];
                 printf("\033[32m    Clé secrète retrouvée: (k1, k2) = (%06x, %06x)\033[0m\n", lm[j][1], lc[i][1]);
             }
-            i++;
-            j++;
+
+            // Gestion du cas où plusieurs éléments à la suite d'une même liste sont égaux.
+            if ( j+1 < NB_K && lm[j+1][0] == lc[i][0] )
+                j++;
+            else if ( i+1 < NB_K && lm[j][0] == lc[i+1][0] )
+                i++;
+            else {
+                i++;
+                j++;
+            }
         }
     }
     printf("    Recherche terminée, \033[33m%d collisions\033[00m rencontrées.\n", collisions);
@@ -167,25 +175,11 @@ void print_listes(int **l_lm, int **l_lc)  {
 }
 
 
-int main(int argc, char const *argv[])  {
-    clock_t tot_begin = clock();
-
-    // Deux listes en entiers pour contenir les listes Lm et Lc de couples (Chiffré, Clé) et (Message, Clé)
-    int **l_lm = (int ** ) malloc(NB_K * sizeof(int * ));
-    int **l_lc = (int ** ) malloc(NB_K * sizeof(int * ));
-    for(int i = 0 ; i < NB_K ; i++ )  { 
-        l_lm[i] = (int * ) malloc(2 * sizeof(int));
-        l_lc[i] = (int * ) malloc(2 * sizeof(int));
-    }
-
-    // uint32_t couple_elyn[4] = {0x16a0e6, 0xdcc916, 0x332962, 0xcfeee9};
-    uint32_t couple[4] = {0x02c315, 0x88b6ed, 0x1d2dec, 0xc4bb7a};
-    uint32_t m1 = couple[0], c1 = couple[1], m2 = couple[2], c2 = couple[3];
+conteneur ATTAQUE(uint32_t m1, uint32_t c1, uint32_t m2, uint32_t c2, int **l_lm, int **l_lc)  {
     printf("           Clair |   Chiffré\n");
     printf("\033[33;1m(m1, c1)  \033[33;1m%06x |    %06x\033[0m\n", m1, c1);
     printf("\033[33;1m(m2, c2)  \033[33;1m%06x |    %06x\033[0m\n\n", m2, c2);
-
-
+    
     clock_t begin = clock();
     printf("Création des listes Lc et Lm...\n");
     GENERER_LISTES(m1, c1, l_lm, l_lc);
@@ -199,122 +193,62 @@ int main(int argc, char const *argv[])  {
     QUICKSORT(l_lm, 0, NB_K-1);
     QUICKSORT(l_lc, 0, NB_K-1);
     printf("    Temps écoulé: %fs pour %d clés\n", (double)(clock() - begin) / CLOCKS_PER_SEC, NB_K);
-    
+        
 
-    // Recherche d'éléments communs
+    // Recherche d'éléments communs (les clés sont stockées dans le conteneur attaque_res)
     conteneur attaque_res;
     begin = clock();
     printf("\nRecherche d'éléments communs et de clé(s) fonctionnelle(s)...\n");
     attaque_res = RECHERCHE_COMMUNS(l_lm, l_lc, m2, c2);
     
     // Vérifier en double-chiffrant m1 et m2
+    printf("\nTest des clé(s) secrète(s):\n");
     uint32_t res;
     for (int i = 0; i < attaque_res.nbr; i++)  {
-        printf("\nTest de la clé secrète: \033[32m(k1, k2) = (%06x, %06x)\033[0m\n", attaque_res.cles[i].k1, attaque_res.cles[i].k2);
+        printf("    %02d. \033[32m(k1, k2) = (%06x, %06x)\033[0m  |  ", i+1, attaque_res.cles[i].k1, attaque_res.cles[i].k2);
         res = CHIFFREMENT_DOUBLE_OPTI(m1, attaque_res.cles[i].k1, attaque_res.cles[i].k2);
-        if (res == c1)
-            printf("\033[32mPassed: %06x -> %06x\033[00m\n", m1, res);
-        else
-            printf("\033[31mFailed: %06x -> %06x || %06x\033[00m\n", m1, c1, res);
-
-        res = CHIFFREMENT_DOUBLE_OPTI(m2, attaque_res.cles[i].k1, attaque_res.cles[i].k2);
-        if (res == c2)
-            printf("\033[32mPassed: %06x -> %06x\033[00m\n", m2, res);
-        else
-            printf("\033[31mFailed: %06x -> %06x || %06x\033[00m\n", m2, c2, res);
+        if (res == c1)  {
+            res = CHIFFREMENT_DOUBLE_OPTI(m2, attaque_res.cles[i].k1, attaque_res.cles[i].k2);
+            if (res == c2)
+                printf("\033[32mClé fonctionnelle\033[00m\n");
+            else
+                printf("\033[31mNon Clé fonctionnelle (found: %06x)\033[00m\n", res);
+        }
     }
-    printf("    Temps écoulé: %fs pour %d clés\n", (double)(clock() - begin) / CLOCKS_PER_SEC, NB_K);
     
+    printf("    Temps écoulé: %fs et %d clés trouvée(s).\n", (double)(clock() - begin) / CLOCKS_PER_SEC, attaque_res.nbr);
 
-    // Free des listes d'entiers
-    begin = clock();
-    // printf("\nLibération de mémoire des deux listes...\n");
+    return attaque_res;
+}
+
+
+int main(int argc, char const *argv[])  {
+    clock_t tot_begin = clock();
+
+    uint32_t couple[4] = {0x02c315, 0x88b6ed, 0x1d2dec, 0xc4bb7a};
+    uint32_t m1 = couple[0], c1 = couple[1], m2 = couple[2], c2 = couple[3];
+
+
+    // Deux listes en entiers pour contenir les listes Lm et Lc de couples (Chiffré, Clé) et (Message, Clé)
+    int **l_lm = (int ** ) malloc(NB_K * sizeof(int * ));
+    int **l_lc = (int ** ) malloc(NB_K * sizeof(int * ));
+    for(int i = 0 ; i < NB_K ; i++ )  { 
+        l_lm[i] = (int * ) malloc(2 * sizeof(int));
+        l_lc[i] = (int * ) malloc(2 * sizeof(int));
+    }
+    
+    
+    ATTAQUE(m1, c1, m2, c2, l_lm, l_lc);
+    
+    
+    // Libération de mémoire des deux listes d'entiers
     for(int i = 0 ; i < NB_K ; i++ )  {  
         free(l_lm[i]);
         free(l_lc[i]);
     }
     free(l_lm);
     free(l_lc);
-    // printf("    Temps écoulé: %fs pour %d clés\n", (double)(clock() - begin) / CLOCKS_PER_SEC, NB_K);
-
+    
     printf("\n\033[33mTemps total écoulé: %fs pour %d clés\n\033[0m", (double)(clock() - tot_begin) / CLOCKS_PER_SEC, NB_K);
     return 0;
 }
-
-
-
-
-/* ***********************************
- *           MODE HASHMAP            *
- * Non utilisé parce que revient à   *
- * gagner peu de temps pour trop de  *
- *         mémoire perdue.           *
- ************************************/
-
-/*
-typedef struct  {
-    int nbr;
-    int *keys;
-} lm_data;
-
-void GENERER_LISTES_TEST(uint32_t clair, lm_data *lm)  { 
-    uint32_t sous_cles[11];
-    uint32_t res;
-    for (int i = 0; i < NB_K; i++)  {
-        CADENCEMENT_CLE_OPTI(i, sous_cles);
-        res = CHIFFREMENT_OPTI(clair, sous_cles);
-        lm[res].nbr += 1;
-        lm[res].keys = (int *) realloc( lm[res].keys, lm[res].nbr * sizeof(int) );
-        lm[res].keys[lm[res].nbr-1] = i;
-    }
-}
-
-void RECHERCHE_TEST(lm_data *lm, uint32_t c1, uint32_t m2, uint32_t c2)  {
-    uint32_t sous_cles[11];
-    uint32_t res, res2;
-    int collisions = 0;
-    int end = 0;
-    for (int i = 0; i < NB_K; i++)  {
-        CADENCEMENT_CLE_OPTI(i, sous_cles);
-        res = DECHIFFREMENT_OPTI(c1, sous_cles);
-        if (lm[res].nbr > 0)  {
-            for (int j = 0; j < lm[res].nbr; j++)  {
-                // Chaque clé k1 de lm
-                res2 = CHIFFREMENT_DOUBLE_OPTI(m2, lm[res].keys[j], i);
-                collisions++;
-                if (res2 == c2)  {
-                    printf("\033[32mClé fonctionnelle trouvée: %06x (%06x, %06x)\033[0m\n", res, lm[res].keys[j], i);
-                    // end = 1;
-                    // break;
-                }
-            }
-        }
-        // if (end)
-        //     break;
-    }
-}
-
-int main(int argc, char const *argv[])  {
-    lm_data *lm = (lm_data * ) malloc(NB_K * sizeof(lm_data));
-
-    uint32_t couple_elyn[4] = {0x16a0e6, 0xdcc916, 0x332962, 0xcfeee9};
-    uint32_t m1 = couple_elyn[0];
-    uint32_t c1 = couple_elyn[1];
-
-    printf("Création de la liste Lm...\n");
-    for (size_t i = 0; i < NB_K; i++)  {
-        lm[i].nbr = 0;
-        lm[i].keys = (int *) malloc( sizeof(int) );
-    }
-    GENERER_LISTES_TEST(m1, lm);
-
-
-    printf("\nDéchiffrement et recherche de clé(s) fonctionnelle(s)...\n");
-    RECHERCHE_TEST(lm, c1, couple_elyn[2], couple_elyn[3]);
-
-
-    for(int i = 0 ; i < NB_K ; i++ ) 
-        free(lm[i].keys);
-    free(lm);
-}
-*/
